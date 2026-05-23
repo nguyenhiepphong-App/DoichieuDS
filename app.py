@@ -11,49 +11,33 @@ with col1:
 with col2:
     file2 = st.file_uploader("Tải DS 2", type=["xlsx"])
 
-def find_col(df, options):
-    """Tìm cột dựa trên danh sách các từ khóa có thể xảy ra"""
-    for col in df.columns:
-        col_clean = str(col).lower().replace(" ", "")
-        for opt in options:
-            if opt in col_clean:
-                return col
-    return None
-
 if file1 and file2:
     try:
         df1 = pd.read_excel(file1)
         df2 = pd.read_excel(file2)
         
-        # Danh sách từ khóa mở rộng (bao gồm cả 'họ và tên')
-        ten_keys = ['hoten', 'hovaten', 'ten']
-        sinh_keys = ['ngaysinh', 'ns']
+        # Ép buộc lấy cột thứ 1 làm Tên và cột thứ 2 làm Ngày sinh (dựa trên ảnh ông chụp)
+        # Tên cột ở vị trí 1 và 2 (theo danh sách 0, 1, 2, 3 của ông)
+        t1, s1 = df1.columns[1], df1.columns[2]
+        t2, s2 = df2.columns[1], df2.columns[2]
         
-        t1, s1 = find_col(df1, ten_keys), find_col(df1, sinh_keys)
-        t2, s2 = find_col(df2, ten_keys), find_col(df2, sinh_keys)
+        # Tạo khóa so sánh
+        df1['key'] = df1[t1].astype(str).str.strip().str.lower() + "_" + df1[s1].astype(str).str.strip()
+        df2['key'] = df2[t2].astype(str).str.strip().str.lower() + "_" + df2[s2].astype(str).str.strip()
         
-        if not all([t1, s1, t2, s2]):
-            st.error("❌ Không tự nhận diện được cột. Vui lòng đổi tên cột trong file thành 'Họ tên' và 'Ngày sinh'")
-            st.write("DS1 cột:", df1.columns.tolist())
-            st.write("DS2 cột:", df2.columns.tolist())
-        else:
-            # Tạo khóa so sánh
-            df1['key'] = df1[t1].astype(str).str.strip().str.lower() + "_" + df1[s1].astype(str).str.strip()
-            df2['key'] = df2[t2].astype(str).str.strip().str.lower() + "_" + df2[s2].astype(str).str.strip()
-            
-            # So sánh
-            thieu_trong_ds2 = df1[~df1['key'].isin(df2['key'])].drop(columns=['key'])
-            thieu_trong_ds1 = df2[~df2['key'].isin(df1['key'])].drop(columns=['key'])
-            
-            st.success("✅ Đã đối soát xong!")
-            
-            # Xuất file
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                thieu_trong_ds2.to_excel(writer, index=False, sheet_name='Thieu_trong_DS2')
-                thieu_trong_ds1.to_excel(writer, index=False, sheet_name='Thieu_trong_DS1')
-            
-            st.download_button("📥 Tải kết quả", data=buffer, file_name="Ket_qua.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        # Đối soát
+        thieu_trong_ds2 = df1[~df1['key'].isin(df2['key'])].drop(columns=['key'])
+        thieu_trong_ds1 = df2[~df2['key'].isin(df1['key'])].drop(columns=['key'])
+        
+        st.success(f"✅ Đã đối soát xong! DS1 thiếu {len(thieu_trong_ds2)} em, DS2 thiếu {len(thieu_trong_ds1)} em.")
+        
+        # Xuất file
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            thieu_trong_ds2.to_excel(writer, index=False, sheet_name='Thieu_trong_DS2')
+            thieu_trong_ds1.to_excel(writer, index=False, sheet_name='Thieu_trong_DS1')
+        
+        st.download_button("📥 Tải kết quả", data=buffer, file_name="Ket_qua.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             
     except Exception as e:
         st.error(f"Lỗi: {e}")
